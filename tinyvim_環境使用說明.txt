@@ -1,0 +1,83 @@
+【TinyViM-S 在我電腦上的使用小抄】
+
+一、每次開啟環境的步驟
+--------------------------------
+1. 開 WSL Ubuntu
+   - 在 Windows PowerShell 或 Windows Terminal 輸入：
+     wsl
+
+2. 啟用 Conda 與 tinyvim 環境
+   - 如果沒有自動載入 Conda，可先執行：
+     source ~/miniconda3/etc/profile.d/conda.sh
+   - 啟用虛擬環境：
+     conda activate tinyvim
+
+3. 進入 TinyViM 專案資料夾
+   cd /mnt/e/FOLDER/學校作業/電腦視覺/final/TinyViM
+
+4. 設定 CUDA 相關環境變數（每個新開的 shell 建議重打一次）
+   export CUDA_HOME=$CONDA_PREFIX
+   export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$CONDA_PREFIX/lib:$CONDA_PREFIX/lib/python3.9/site-packages/torch/lib:$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+
+二、測試 TinyViM-S 是否能正常執行
+--------------------------------
+在上述步驟 1–4 都完成後，在 TinyViM 目錄中執行：
+
+   python speed_gpu.py --model TinyViM_S --resolution 224 --batch 32
+
+如果有印出類似：
+
+   TinyViM_S cuda:0 XXXX images/s @ batch size 32
+
+代表模型與 CUDA 擴充都運作正常。
+
+
+三、未來要開始訓練時的基本指令（範例）
+--------------------------------
+1. 先確認資料集路徑
+   - 例如：/mnt/e/datasets/imagenet
+   - 裡面需有 train/ 和 val/ 子資料夾（如果是自訂資料集，結構需符合 PyTorch ImageFolder）
+
+2. 在 TinyViM 目錄中啟用環境與 CUDA 變數（同上一節）：
+   conda activate tinyvim
+   cd /mnt/e/FOLDER/學校作業/電腦視覺/final/TinyViM
+   export CUDA_HOME=$CONDA_PREFIX
+   export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$CONDA_PREFIX/lib:$CONDA_PREFIX/lib/python3.9/site-packages/torch/lib:$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+3. 使用單 GPU 啟動訓練（請依實際路徑與顯存調整參數）
+   python main.py \
+     --model TinyViM_S \
+     --data-path /mnt/e/你的資料路徑 \
+     --batch-size 64
+
+   說明：
+   - 將 /mnt/e/你的資料路徑 改成實際資料集所在的路徑。
+   - 如果出現 CUDA out of memory，可把 --batch-size 64 改成 32 或 16 再試。
+
+
+四、檔案在哪裡
+--------------------------------
+1. 程式碼位置（Windows 檔案總管）
+   - E:\FOLDER\學校作業\電腦視覺\final\TinyViM
+
+2. VMamba 的 selective_scan CUDA 模組
+   - WSL 路徑：~/VMamba/kernels/selective_scan
+   - 若之後需要重新編譯，可在該資料夾中執行：
+     conda activate tinyvim
+     python setup.py install
+
+
+五、常見狀況簡記
+--------------------------------
+1. 找不到 libcuda.so 或 cudnn
+   - 通常是 LD_LIBRARY_PATH 沒設好，重新執行：
+     export CUDA_HOME=$CONDA_PREFIX
+     export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$CONDA_PREFIX/lib:$CONDA_PREFIX/lib/python3.9/site-packages/torch/lib:$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+2. 匯入 CUDA 擴充錯誤（selective_scan_cuda 相關）
+   - 目前程式已改成使用：
+     import selective_scan_cuda_oflex as selective_scan_cuda
+   - 若重新編譯 VMamba，記得維持這個 import 寫法。
+
+
