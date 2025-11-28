@@ -191,7 +191,9 @@ def main():
     model.to(device)
 
     # 準備 DataLoader
-    train_dir = Path(args.train-dir) if hasattr(args, "train-dir") else Path(args.train_dir)
+    # argparse 會把選項名稱中的 '-' 轉成屬性名稱裡的 '_'，
+    # 所以這裡正確的寫法就是 args.train_dir（不會有 args.train-dir 這種屬性）。
+    train_dir = Path(args.train_dir)
     val_dir = Path(args.val_dir)
     if not train_dir.is_dir():
         raise FileNotFoundError(f"Train dir not found: {train_dir}")
