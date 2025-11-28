@@ -9,7 +9,8 @@ import torch.utils.checkpoint as checkpoint
 from einops import rearrange, repeat
 from timm.models.layers import DropPath, trunc_normal_
 DropPath.__repr__ = lambda self: f"timm.DropPath({self.drop_prob})"
-import selective_scan_cuda
+# 使用已編譯好的 oflex 版本 CUDA 擴充，並統一別名為 selective_scan_cuda
+import selective_scan_cuda_oflex as selective_scan_cuda
 
 
 class Conv2d_BN(torch.nn.Sequential):
@@ -183,8 +184,13 @@ class SelectiveScan(torch.autograd.Function):
         if C.dim() == 3:
             C = C.unsqueeze(dim=1)
             ctx.squeeze_C = True
-        
-        out, x, *rest = selective_scan_cuda.fwd(u, delta, A, B, C, D, None, delta_bias, delta_softplus)
+
+        # `selective_scan_cuda_oflex.fwd` 的簽名為：
+        # fwd(u, delta, A, B, C, D=None, delta_bias=None, delta_softplus=False, nrows=1, bidirectional=False)
+        # 這裡對應地傳入目前 context 中的 `delta_bias`、`delta_softplus` 以及 `nrows`
+        out, x, *rest = selective_scan_cuda.fwd(
+            u, delta, A, B, C, D, delta_bias, delta_softplus, ctx.nrows, False
+        )
         
         ctx.save_for_backward(u, delta, A, B, C, D, delta_bias, x)
         return out
@@ -195,10 +201,11 @@ class SelectiveScan(torch.autograd.Function):
         u, delta, A, B, C, D, delta_bias, x = ctx.saved_tensors
         if dout.stride(-1) != 1:
             dout = dout.contiguous()
-        
+
+        # `selective_scan_cuda_oflex.bwd` 的簽名為：
+        # bwd(u, delta, A, B, C, D, delta_bias, dout, x=None, delta_softplus=False, nrows=1)
         du, ddelta, dA, dB, dC, dD, ddelta_bias, *rest = selective_scan_cuda.bwd(
-            u, delta, A, B, C, D, None, delta_bias, dout, x, None, None, ctx.delta_softplus,
-            False  # option to recompute out_z, not used here
+            u, delta, A, B, C, D, delta_bias, dout, x, ctx.delta_softplus, ctx.nrows
         )
         
         dB = dB.squeeze(1) if getattr(ctx, "squeeze_B", False) else dB

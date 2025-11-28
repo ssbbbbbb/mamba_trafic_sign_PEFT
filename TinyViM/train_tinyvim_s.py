@@ -5,6 +5,7 @@ from pathlib import Path
 import time
 import datetime
 import csv
+import sys
 
 import torch
 import torch.nn as nn
@@ -21,6 +22,29 @@ from torchvision import datasets
 import model
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+class _Tee:
+    """同時把輸出寫到原本的 stdout/stderr 與檔案。"""
+
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, data):
+        for f in self.files:
+            f.write(data)
+            f.flush()
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+
+try:
+    from tqdm import tqdm
+    _HAS_TQDM = True
+except ImportError:
+    _HAS_TQDM = False
 
 
 def parse_args():
@@ -58,6 +82,13 @@ def parse_args():
         default="",
         type=str,
         help="預訓練權重檔路徑（.pth，checkpoint['model'] 格式；留空則從頭訓練）",
+    )
+
+    # 只訓練分類 head（凍結 backbone）
+    parser.add_argument(
+        "--only-train-head",
+        action="store_true",
+        help="只訓練分類 head，其他 backbone 參數全部凍結",
     )
 
     # 訓練超參數
@@ -119,7 +150,11 @@ def train_one_epoch(model, loader, criterion, optimizer, device, epoch):
     running_correct = 0
     total = 0
 
-    for i, (images, targets) in enumerate(loader):
+    iterable = loader
+    if _HAS_TQDM:
+        iterable = tqdm(loader, desc=f"Train epoch {epoch}", leave=False)
+
+    for i, (images, targets) in enumerate(iterable):
         images = images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
 
@@ -146,8 +181,12 @@ def evaluate(model, loader, criterion, device, epoch):
     running_correct = 0
     total = 0
 
+    iterable = loader
+    if _HAS_TQDM:
+        iterable = tqdm(loader, desc=f"Val epoch {epoch}", leave=False)
+
     with torch.no_grad():
-        for images, targets in loader:
+        for images, targets in iterable:
             images = images.to(device, non_blocking=True)
             targets = targets.to(device, non_blocking=True)
 
@@ -184,11 +223,48 @@ def main():
     if args.checkpoint:
         print(f"Loading checkpoint from {args.checkpoint}")
         ckpt = torch.load(args.checkpoint, map_location="cpu")
-        state = ckpt.get("model", ckpt)
-        msg = model.load_state_dict(state, strict=False)
+        checkpoint_model = ckpt.get("model", ckpt)
+        state_dict = model.state_dict()
+        # 將輸出 head 等 shape 不相符的權重刪掉，避免類別數改成 43 時發生 size mismatch
+        for k in list(checkpoint_model.keys()):
+            if k in state_dict and checkpoint_model[k].shape != state_dict[k].shape:
+                print(
+                    f"Removing key {k} from pretrained checkpoint due to shape mismatch: "
+                    f"{checkpoint_model[k].shape} vs {state_dict[k].shape}"
+                )
+                del checkpoint_model[k]
+        msg = model.load_state_dict(checkpoint_model, strict=False)
         print(f"Checkpoint loaded with message: {msg}")
 
     model.to(device)
+
+    # 若只訓練 head，先凍結 backbone，再開啟 head 相關參數
+    if args.only_train_head:
+        print("Only training classifier head: freezing all backbone parameters.")
+        for n, p in model.named_parameters():
+            p.requires_grad = False
+
+        trainable_names = []
+        # Unfreeze head
+        if hasattr(model, "head"):
+            for p in model.head.parameters():
+                p.requires_grad = True
+            trainable_names.append("head")
+        # 某些 timm 模型使用 fc 作為分類 head
+        if hasattr(model, "fc"):
+            for p in model.fc.parameters():
+                p.requires_grad = True
+            trainable_names.append("fc")
+        # 若有 distillation head 也一併打開
+        if hasattr(model, "head_dist") and getattr(model, "head_dist") is not None:
+            for p in model.head_dist.parameters():
+                p.requires_grad = True
+            trainable_names.append("head_dist")
+
+        # 列出實際可訓練參數名稱方便確認
+        trainable_params = [n for n, p in model.named_parameters() if p.requires_grad]
+        print(f"Trainable modules: {trainable_names}")
+        print(f"Trainable parameters (by name): {trainable_params}")
 
     # 準備 DataLoader
     # argparse 會把選項名稱中的 '-' 轉成屬性名稱裡的 '_'，
@@ -218,8 +294,11 @@ def main():
         )
 
     criterion = nn.CrossEntropyLoss()
+    # 只對 requires_grad=True 的參數做優化，確保凍結的層不會更新
     optimizer = optim.AdamW(
-        model.parameters(), lr=args.lr, weight_decay=args.weight_decay
+        (p for p in model.parameters() if p.requires_grad),
+        lr=args.lr,
+        weight_decay=args.weight_decay,
     )
     scheduler = optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=args.epochs
@@ -230,7 +309,13 @@ def main():
     time_str = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     out_dir = out_root / f"{args.model}_{time_str}"
     out_dir.mkdir(parents=True, exist_ok=True)
+    # 將之後的所有終端輸出同時寫到檔案（類似 tee）
+    log_path = out_dir / "train_log.txt"
+    log_file = log_path.open("a", encoding="utf-8")
+    sys.stdout = _Tee(sys.stdout, log_file)
+    sys.stderr = _Tee(sys.stderr, log_file)
     print(f"Output dir: {out_dir}")
+    print(f"Logging to: {log_path}")
 
     history = []
     best_acc1 = 0.0
