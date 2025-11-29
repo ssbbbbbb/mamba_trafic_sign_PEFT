@@ -21,6 +21,19 @@ from torchvision import datasets
 # 匯入本專案的 `model`，讓 TinyViM_S / B / L 透過 timm 的 @register_model 註冊
 import model
 
+try:
+    import matplotlib.pyplot as plt
+    _HAS_MPL = True
+except ImportError:
+    _HAS_MPL = False
+
+try:
+    # Lie-Group PEFT（Generalized Tensor-based PEFT via Lie Group）
+    from lie_peft import apply_lie_peft, freeze_backbone
+    _HAS_LIE_PEFT = True
+except ImportError:
+    _HAS_LIE_PEFT = False
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -49,7 +62,7 @@ except ImportError:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        "TinyViM-S 訓練自訂資料集（不含 Lie-PEFT / liera）",
+        "TinyViM-S 訓練自訂資料集（支援 Lie-PEFT / liera）",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     # 模型與資料相關設定
@@ -89,6 +102,32 @@ def parse_args():
         "--only-train-head",
         action="store_true",
         help="只訓練分類 head，其他 backbone 參數全部凍結",
+    )
+
+    # Lie-Group PEFT（Generalized Tensor-based PEFT via Lie Group）
+    parser.add_argument(
+        "--use-lie-peft",
+        action="store_true",
+        help="啟用 Lie-PEFT 微調（會先凍結 backbone，再注入低秩 Lie-PEFT 參數）",
+    )
+    parser.add_argument(
+        "--lie-rank",
+        type=int,
+        default=4,
+        help="Lie-PEFT rank r",
+    )
+    parser.add_argument(
+        "--lie-alpha",
+        type=float,
+        default=16.0,
+        help="Lie-PEFT scaling factor alpha",
+    )
+    parser.add_argument(
+        "--lie-target",
+        type=str,
+        default="all",
+        choices=["all", "head", "last_stage"],
+        help="要在那些層套用 Lie-PEFT 參數",
     )
 
     # 訓練超參數
@@ -238,8 +277,26 @@ def main():
 
     model.to(device)
 
+    # 若啟用 Lie-PEFT，使用 Lie 群低秩參數進行微調
+    if args.use_lie_peft:
+        if not _HAS_LIE_PEFT:
+            raise ImportError(
+                "偵測不到 lie_peft 模組，無法使用 --use-lie-peft。"
+                "請確認 lie_peft.py 可被 Python 匯入，或在專案根目錄執行。"
+            )
+        print("Enable Lie-Group based PEFT (Generalized Tensor-based PEFT via Lie Group).")
+        # 先凍結 backbone，再注入 Lie-PEFT 參數
+        freeze_backbone(model)
+        apply_lie_peft(
+            model,
+            rank=args.lie_rank,
+            alpha=args.lie_alpha,
+            target=args.lie_target,
+        )
+        # 此時 optimizer 只會看到 requires_grad=True 的 Lie-PEFT 參數與 head 參數
+
     # 若只訓練 head，先凍結 backbone，再開啟 head 相關參數
-    if args.only_train_head:
+    elif args.only_train_head:
         print("Only training classifier head: freezing all backbone parameters.")
         for n, p in model.named_parameters():
             p.requires_grad = False
@@ -384,6 +441,42 @@ def main():
             for row in history:
                 writer.writerow(row)
         print(f"Saved metrics CSV to {metrics_csv}")
+
+        # 若有 matplotlib，順便畫出訓練 / 驗證曲線圖
+        if _HAS_MPL:
+            epochs = [h["epoch"] for h in history]
+            train_loss = [h["train_loss"] for h in history]
+            val_loss = [h["val_loss"] for h in history]
+            train_acc1 = [h["train_acc1"] for h in history]
+            val_acc1 = [h["val_acc1"] for h in history]
+
+            # Loss 曲線
+            plt.figure()
+            plt.plot(epochs, train_loss, label="train_loss")
+            plt.plot(epochs, val_loss, label="val_loss")
+            plt.xlabel("Epoch")
+            plt.ylabel("Loss")
+            plt.title(f"Loss Curve - {args.model}")
+            plt.legend()
+            loss_png = out_dir / "loss_curve.png"
+            plt.savefig(loss_png, bbox_inches="tight")
+            plt.close()
+
+            # Acc@1 曲線
+            plt.figure()
+            plt.plot(epochs, train_acc1, label="train_acc1")
+            plt.plot(epochs, val_acc1, label="val_acc1")
+            plt.xlabel("Epoch")
+            plt.ylabel("Acc@1 (%)")
+            plt.title(f"Accuracy Curve - {args.model}")
+            plt.legend()
+            acc_png = out_dir / "acc1_curve.png"
+            plt.savefig(acc_png, bbox_inches="tight")
+            plt.close()
+
+            print(f"Saved curves to {out_dir}")
+        else:
+            print("matplotlib 未安裝，只輸出 metrics.csv，不繪製曲線圖。")
 
     print(f"Best val_acc1: {best_acc1:.2f}%")
     if best_ckpt_path.exists():
