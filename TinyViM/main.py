@@ -195,6 +195,12 @@ def get_args_parser():
     parser.add_argument('--save_freq', default=1, type=int,
                         help='frequency of model saving')
 
+    # Early stopping parameters
+    parser.add_argument('--early-stop-patience', type=int, default=0,
+                        help='If > 0, stop training early when val acc1 has not improved for this many epochs')
+    parser.add_argument('--early-stop-min-delta', type=float, default=0.0,
+                        help='Minimum improvement in val acc1 to reset early stopping counter')
+
     # Lie-Group PEFT (Generalized Tensor-based PEFT via Lie Group)
     parser.add_argument('--use-lie-peft', action='store_true',
                         help='Enable Lie-group based PEFT fine-tuning (Generalized Tensor-based PEFT)')
@@ -411,9 +417,9 @@ def main(args):
     if args.eval:
         utils.replace_batchnorm(model) # Users may choose whether to merge Conv-BN layers during eval
         print(f"Evaluating model: {args.model}")
-        test_stats = evaluate(data_loader_val, model, device)
+        val_stats = evaluate(data_loader_val, model, device)
         print(
-            f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+            f"Accuracy of the network on the {len(dataset_val)} val images: {val_stats['acc1']:.1f}%")
         return
 
     print(f"Start training for {args.epochs} epochs")
@@ -423,6 +429,9 @@ def main(args):
     history = []
     last_ckpt_path = None
     best_ckpt_path = output_dir / 'checkpoint_best.pth'
+    # Early stopping 狀態
+    best_acc_early = 0.0
+    epochs_no_improve = 0
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
@@ -461,7 +470,7 @@ def main(args):
                 os.remove(os.path.join(output_dir, 'checkpoint_'+str(remove_epoch)+'.pth'))
             last_ckpt_path = ckpt_path
 
-        if max_accuracy < test_stats["acc1"]:
+        if max_accuracy < val_stats["acc1"]:
             utils.save_on_master({
                     'model': model_without_ddp.state_dict(),
                     'optimizer': optimizer.state_dict(),
@@ -471,14 +480,29 @@ def main(args):
                     'scaler': loss_scaler.state_dict(),
                     'args': args,
                 }, os.path.join(output_dir, 'checkpoint_best.pth'))
-        max_accuracy = max(max_accuracy, test_stats["acc1"])
+        max_accuracy = max(max_accuracy, val_stats["acc1"])
         
         print(f'Max accuracy: {max_accuracy:.2f}%')
+
+        # Early stopping：根據 val acc1 判斷是否持續進步
+        current_acc = float(val_stats["acc1"])
+        if current_acc > best_acc_early + args.early_stop_min_delta:
+            best_acc_early = current_acc
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+
+        if args.early_stop_patience > 0 and epochs_no_improve >= args.early_stop_patience:
+            print(
+                f"Early stopping triggered: val acc1 has not improved for "
+                f"{epochs_no_improve} epochs (best={best_acc_early:.2f}%)."
+            )
+            break
         
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                        **{f'test_{k}': v for k, v in test_stats.items()},
-                        'epoch': epoch,
-                        'n_parameters': n_parameters}
+                     **{f'val_{k}': v for k, v in val_stats.items()},
+                     'epoch': epoch,
+                     'n_parameters': n_parameters}
         history.append(log_stats)
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
@@ -486,7 +510,10 @@ def main(args):
 
     # 將每個 epoch 的數值存成 CSV，並在 test_output 下繪製曲線圖
     if utils.is_main_process() and len(history) > 0:
-        test_output_dir = PROJECT_ROOT / "test_output"
+        test_output_root = PROJECT_ROOT / "test_output"
+        # 使用 --project 參數作為子資料夾名稱，方便區分不同實驗
+        # 例如：--project l -> final/test_output/l
+        test_output_dir = test_output_root / args.project
         test_output_dir.mkdir(parents=True, exist_ok=True)
 
         metrics_csv = test_output_dir / f"metrics_{args.model}_{output_dir.name}.csv"
@@ -501,13 +528,13 @@ def main(args):
         if _HAS_MPL:
             epochs = [h["epoch"] for h in history]
             train_loss = [h.get("train_loss") for h in history]
-            test_loss = [h.get("test_loss") for h in history]
-            test_acc1 = [h.get("test_acc1") for h in history]
+            val_loss_hist = [h.get("val_loss") for h in history]
+            val_acc1_hist = [h.get("val_acc1") for h in history]
 
             # Loss 曲線
             plt.figure()
             plt.plot(epochs, train_loss, label="train_loss")
-            plt.plot(epochs, test_loss, label="val_loss")
+            plt.plot(epochs, val_loss_hist, label="val_loss")
             plt.xlabel("Epoch")
             plt.ylabel("Loss")
             plt.legend()
@@ -517,9 +544,9 @@ def main(args):
             plt.close()
 
             # Acc@1 曲線
-            if any(a is not None for a in test_acc1):
+            if any(a is not None for a in val_acc1_hist):
                 plt.figure()
-                plt.plot(epochs, test_acc1, label="val_acc1")
+                plt.plot(epochs, val_acc1_hist, label="val_acc1")
                 plt.xlabel("Epoch")
                 plt.ylabel("Acc@1 (%)")
                 plt.legend()
