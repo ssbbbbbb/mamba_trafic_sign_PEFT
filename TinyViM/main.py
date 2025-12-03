@@ -1,11 +1,14 @@
 import argparse
+import csv
 import datetime
+import json
 import numpy as np
+import os
+import shutil
 import time
+
 import torch
 import torch.backends.cudnn as cudnn
-import json
-import os
 
 from pathlib import Path
 
@@ -24,6 +27,36 @@ from losses import DistillationLoss
 
 import model
 import utils
+
+try:
+    import matplotlib.pyplot as plt
+    _HAS_MPL = True
+except ImportError:
+    _HAS_MPL = False
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def freeze_backbone(model, unfreeze_head: bool = True):
+    """
+    凍結 backbone 參數，但保留分類頭可訓練。
+    
+    Args:
+        model: 模型
+        unfreeze_head: 是否保留 head 可訓練（預設 True）
+    """
+    for p in model.parameters():
+        p.requires_grad = False
+    
+    # 解凍分類頭（head）讓它可以完全訓練
+    if unfreeze_head:
+        if hasattr(model, 'head'):
+            for p in model.head.parameters():
+                p.requires_grad = True
+        if hasattr(model, 'fc'):
+            for p in model.fc.parameters():
+                p.requires_grad = True
 
 
 def get_args_parser():
@@ -143,13 +176,15 @@ def get_args_parser():
     # Finetuning params
     parser.add_argument('--finetune', default='',
                         help='finetune from checkpoint')
+    parser.add_argument('--freeze-backbone', action='store_true',
+                        help='Freeze backbone and only train head')
     parser.add_argument('--set_bn_eval', action='store_true', default=False,
                         help='set BN layers to eval mode during finetuning.')
 
     # Dataset parameters
     parser.add_argument('--data-path', default='/root/FastBaseline/data/imagenet', type=str,
                         help='dataset path')
-    parser.add_argument('--data-set', default='IMNET', choices=['CIFAR', 'IMNET', 'INAT', 'INAT19'],
+    parser.add_argument('--data-set', default='IMNET', choices=['CIFAR', 'IMNET', 'INAT', 'INAT19', 'CUSTOM'],
                         type=str, help='Image Net dataset path')
     parser.add_argument('--inat-category', default='name',
                         choices=['kingdom', 'phylum', 'class', 'order',
@@ -181,7 +216,13 @@ def get_args_parser():
                         help='url used to set up distributed training')
     parser.add_argument('--save_freq', default=1, type=int,
                         help='frequency of model saving')
-    
+
+    # Early stopping parameters
+    parser.add_argument('--early-stop-patience', type=int, default=0,
+                        help='If > 0, stop training early when val acc1 has not improved for this many epochs')
+    parser.add_argument('--early-stop-min-delta', type=float, default=0.0,
+                        help='Minimum improvement in val acc1 to reset early stopping counter')
+
     parser.add_argument('--deploy', action='store_true', default=False)
     parser.add_argument('--project', default='tinyvim', type=str)
     return parser
@@ -277,16 +318,42 @@ def main(args):
 
         checkpoint_model = checkpoint['model']
         state_dict = model.state_dict()
-        for k in ['head.l.weight', 'head.l.bias',
-                  'head_dist.l.weight', 'head_dist.l.bias']:
-            if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
-                print(f"Removing key {k} from pretrained checkpoint")
+        # 將分類 head / dist_head 等輸出層（或任何 shape 不符的層）從 checkpoint 中移除，
+        # 讓目前 num_classes 的 head 用新的隨機初始化權重。
+        for k in list(checkpoint_model.keys()):
+            if k in state_dict and checkpoint_model[k].shape != state_dict[k].shape:
+                print(f"Removing key {k} from pretrained checkpoint due to shape mismatch: "
+                      f"{checkpoint_model[k].shape} vs {state_dict[k].shape}")
                 del checkpoint_model[k]
 
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
     model.to(device)
+
+    # 若啟用 freeze-backbone，凍結 backbone 只訓練 head
+    if args.freeze_backbone:
+        print("\n" + "="*60)
+        print("🔧 Freeze Backbone Configuration")
+        print("="*60)
+        print("  • Backbone: frozen ❄️")
+        print("  • Head: trainable 🔥")
+        print("-"*60)
+        
+        freeze_backbone(model, unfreeze_head=True)
+        
+        # 統計參數
+        frozen_params = sum(p.numel() for p in model.parameters() if not p.requires_grad)
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        total_params = frozen_params + trainable_params
+        
+        print("📊 Parameter Statistics:")
+        print(f"  • Backbone (frozen):     {frozen_params:,} params ❄️")
+        print(f"  • Head (trainable):      {trainable_params:,} params 🔥")
+        print("-"*60)
+        print(f"  • Total params:          {total_params:,}")
+        print(f"  • Trainable params:      {trainable_params:,} ({100*trainable_params/total_params:.2f}%)")
+        print("="*60 + "\n")
 
     model_ema = None
     if args.model_ema:
@@ -303,9 +370,10 @@ def main(args):
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[args.gpu])
         model_without_ddp = model.module
-    n_parameters = sum(p.numel()
-                       for p in model.parameters() if p.requires_grad)
-    print('number of params:', n_parameters)
+    
+    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    if not args.freeze_backbone:
+        print(f'number of params: {n_parameters:,}')
 
     linear_scaled_lr = args.lr * args.batch_size * utils.get_world_size() / 512.0
     args.lr = linear_scaled_lr
@@ -380,19 +448,32 @@ def main(args):
     if args.eval:
         utils.replace_batchnorm(model) # Users may choose whether to merge Conv-BN layers during eval
         print(f"Evaluating model: {args.model}")
-        test_stats = evaluate(data_loader_val, model, device)
+        val_stats = evaluate(data_loader_val, model, device)
         print(
-            f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+            f"Accuracy of the network on the {len(dataset_val)} val images: {val_stats['acc1']:.1f}%")
         return
 
-    print(f"Start training for {args.epochs} epochs")
+    print("\n" + "="*60)
+    print(f"🚀 Start training for {args.epochs} epochs")
+    print("="*60)
     start_time = time.time()
     max_accuracy = 0.0
+    best_loss = float('inf')  # 用於 acc 相同時比較 loss
     max_accuracy_ema = 0.0
+    history = []
+    last_ckpt_path = None
+    best_ckpt_path = output_dir / 'checkpoint_best.pth'
+    # Early stopping 狀態
+    best_acc_early = 0.0
+    epochs_no_improve = 0
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
 
+        print(f"\n{'─'*60}")
+        print(f"📅 Epoch {epoch}/{args.epochs - 1}")
+        print(f"{'─'*60}")
+        
         train_stats = train_one_epoch(
             model, criterion, data_loader_train,
             optimizer, device, epoch, loss_scaler,
@@ -404,53 +485,153 @@ def main(args):
 
         lr_scheduler.step(epoch)
 
-        test_stats = evaluate(data_loader_val, model, device)
-        print(
-            f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+        # 驗證集評估（val_stats）
+        val_stats = evaluate(data_loader_val, model, device)
+        
+        # 檢查是否為新的最佳：acc 更高，或 acc 相同但 loss 更低
+        current_acc = val_stats["acc1"]
+        current_loss = val_stats["loss"]
+        is_best = (current_acc > max_accuracy) or \
+                  (current_acc == max_accuracy and current_loss < best_loss)
+        
+        if is_best:
+            max_accuracy = current_acc
+            best_loss = current_loss
+        
+        # Epoch 摘要
+        print(f"{'─'*60}")
+        best_marker = " 🏆 New Best!" if is_best else ""
+        print(f"✨ Best Acc@1: {max_accuracy:.2f}% (loss: {best_loss:.4f}){best_marker}")
         
         if args.output_dir:
             ckpt_path = os.path.join(output_dir, 'checkpoint_'+str(epoch)+'.pth')
             checkpoint_paths = [ckpt_path]
-            print("Saving checkpoint to {}".format(ckpt_path))
             for checkpoint_path in checkpoint_paths:
-                utils.save_on_master({
+                state = {
                     'model': model_without_ddp.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'lr_scheduler': lr_scheduler.state_dict(),
                     'epoch': epoch,
-                    'model_ema': get_state_dict(model_ema),
                     'scaler': loss_scaler.state_dict(),
                     'args': args,
-                }, checkpoint_path)
+                }
+                # 只有在啟用 EMA 時才儲存 model_ema
+                if model_ema is not None:
+                    state['model_ema'] = get_state_dict(model_ema)
+                utils.save_on_master(state, checkpoint_path)
             remove_epoch = epoch - 3
             if remove_epoch >= 0 and utils.is_main_process():
-                os.remove(os.path.join(output_dir, 'checkpoint_'+str(remove_epoch)+'.pth'))
+                old_ckpt = os.path.join(output_dir, 'checkpoint_'+str(remove_epoch)+'.pth')
+                if os.path.exists(old_ckpt):
+                    os.remove(old_ckpt)
+            last_ckpt_path = ckpt_path
 
-        if max_accuracy < test_stats["acc1"]:
-            utils.save_on_master({
-                    'model': model_without_ddp.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'lr_scheduler': lr_scheduler.state_dict(),
-                    'epoch': epoch,
-                    'model_ema': get_state_dict(model_ema),
-                    'scaler': loss_scaler.state_dict(),
-                    'args': args,
-                }, os.path.join(output_dir, 'checkpoint_best.pth'))
-        max_accuracy = max(max_accuracy, test_stats["acc1"])
-        
-        print(f'Max accuracy: {max_accuracy:.2f}%')
+        if is_best:
+            state_best = {
+                'model': model_without_ddp.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'lr_scheduler': lr_scheduler.state_dict(),
+                'epoch': epoch,
+                'scaler': loss_scaler.state_dict(),
+                'args': args,
+            }
+            if model_ema is not None:
+                state_best['model_ema'] = get_state_dict(model_ema)
+            utils.save_on_master(state_best, os.path.join(output_dir, 'checkpoint_best.pth'))
+            print(f"💾 Saved best checkpoint (epoch {epoch})")
+
+        # Early stopping：根據 val acc1 判斷是否持續進步
+        if current_acc > best_acc_early + args.early_stop_min_delta:
+            best_acc_early = current_acc
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+
+        if args.early_stop_patience > 0 and epochs_no_improve >= args.early_stop_patience:
+            print(
+                f"\n⏹️  Early stopping triggered: val acc1 has not improved for "
+                f"{epochs_no_improve} epochs (best={best_acc_early:.2f}%)."
+            )
+            break
         
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                        **{f'test_{k}': v for k, v in test_stats.items()},
-                        'epoch': epoch,
-                        'n_parameters': n_parameters}
+                     **{f'val_{k}': v for k, v in val_stats.items()},
+                     'epoch': epoch,
+                     'n_parameters': n_parameters}
+        history.append(log_stats)
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
 
+    # 將每個 epoch 的數值存成 CSV，並在 test_output 下繪製曲線圖
+    if utils.is_main_process() and len(history) > 0:
+        test_output_root = PROJECT_ROOT / "test_output"
+        # 使用 --project 參數作為子資料夾名稱，方便區分不同實驗
+        # 例如：--project l -> final/test_output/l
+        test_output_dir = test_output_root / args.project
+        test_output_dir.mkdir(parents=True, exist_ok=True)
+
+        metrics_csv = test_output_dir / f"metrics_{args.model}_{output_dir.name}.csv"
+        fieldnames = sorted(history[0].keys())
+        with metrics_csv.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in history:
+                writer.writerow(row)
+        print(f"Saved metrics CSV to {metrics_csv}")
+
+        if _HAS_MPL:
+            epochs = [h["epoch"] for h in history]
+            train_loss = [h.get("train_loss") for h in history]
+            val_loss_hist = [h.get("val_loss") for h in history]
+            val_acc1_hist = [h.get("val_acc1") for h in history]
+
+            # Loss 曲線
+            plt.figure()
+            plt.plot(epochs, train_loss, label="train_loss")
+            plt.plot(epochs, val_loss_hist, label="val_loss")
+            plt.xlabel("Epoch")
+            plt.ylabel("Loss")
+            plt.legend()
+            plt.title(f"Loss Curve - {args.model}")
+            loss_png = test_output_dir / f"loss_curve_{args.model}_{output_dir.name}.png"
+            plt.savefig(loss_png, bbox_inches="tight")
+            plt.close()
+
+            # Acc@1 曲線
+            if any(a is not None for a in val_acc1_hist):
+                plt.figure()
+                plt.plot(epochs, val_acc1_hist, label="val_acc1")
+                plt.xlabel("Epoch")
+                plt.ylabel("Acc@1 (%)")
+                plt.legend()
+                plt.title(f"Accuracy Curve - {args.model}")
+                acc_png = test_output_dir / f"acc1_curve_{args.model}_{output_dir.name}.png"
+                plt.savefig(acc_png, bbox_inches="tight")
+                plt.close()
+
+            print(f"📈 Saved curves to {test_output_dir}")
+
+        # 複製最佳與最後權重到 test_output
+        if best_ckpt_path.exists():
+            dst_best = test_output_dir / f"{args.model}_best.pth"
+            shutil.copy2(best_ckpt_path, dst_best)
+            print(f"💾 Copied best checkpoint to {dst_best}")
+        if last_ckpt_path is not None and Path(last_ckpt_path).exists():
+            dst_last = test_output_dir / f"{args.model}_last.pth"
+            shutil.copy2(last_ckpt_path, dst_last)
+            print(f"💾 Copied last checkpoint to {dst_last}")
+
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-    print('Training time {}'.format(total_time_str))
+    
+    print("\n" + "="*60)
+    print("🎉 Training Complete!")
+    print("="*60)
+    print(f"  • Total time:    {total_time_str}")
+    print(f"  • Best Acc@1:    {max_accuracy:.2f}%")
+    print(f"  • Total epochs:  {len(history)}")
+    print("="*60)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
