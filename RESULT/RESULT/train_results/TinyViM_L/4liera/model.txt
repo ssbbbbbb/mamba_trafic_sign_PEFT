@@ -1,0 +1,1080 @@
+TinyViM(
+  (patch_embed): Sequential(
+    (0): Conv2d_BN(
+      (c): LiePEFTConv2d(
+        (base): Conv2d(3, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      )
+      (bn): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    )
+    (1): GELU(approximate='none')
+    (2): Conv2d_BN(
+      (c): LiePEFTConv2d(
+        (base): Conv2d(32, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      )
+      (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    )
+    (3): GELU(approximate='none')
+  )
+  (network): ModuleList(
+    (0): Sequential(
+      (0): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=64, bias=False)
+            )
+            (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), groups=64)
+          )
+          (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(256, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (1): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=64, bias=False)
+            )
+            (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), groups=64)
+          )
+          (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(256, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (2): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=64, bias=False)
+            )
+            (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), groups=64)
+          )
+          (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(256, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (3): TViMBlock(
+        (op): SS2D(
+          (pool): AvgPool2d(kernel_size=8, stride=8, padding=0)
+          (local_conv): RepDW(
+            (conv): Conv2d_BN(
+              (c): LiePEFTConv2d(
+                (base): Conv2d(48, 48, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=48, bias=False)
+              )
+              (bn): BatchNorm2d(48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+            (conv1): LiePEFTConv2d(
+              (base): Conv2d(48, 48, kernel_size=(1, 1), stride=(1, 1), groups=48)
+            )
+            (bn): BatchNorm2d(48, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (out_norm): LayerNorm((16,), eps=1e-05, elementwise_affine=True)
+          (in_proj): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): SiLU()
+          (conv2d): Rep_Inception(
+            (dwconv_h): RepDW_Axias(
+              (conv1): LiePEFTConv2d(
+                (base): Conv2d(32, 32, kernel_size=(1, 1), stride=(1, 1), groups=32)
+              )
+              (conv): Conv2d_BN(
+                (c): LiePEFTConv2d(
+                  (base): Conv2d(32, 32, kernel_size=(1, 7), stride=(1, 1), padding=(0, 3), groups=32, bias=False)
+                )
+                (bn): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (bn): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+            (dwconv_w): RepDW_Axias(
+              (conv1): LiePEFTConv2d(
+                (base): Conv2d(32, 32, kernel_size=(1, 1), stride=(1, 1), groups=32)
+              )
+              (conv): Conv2d_BN(
+                (c): LiePEFTConv2d(
+                  (base): Conv2d(32, 32, kernel_size=(7, 1), stride=(1, 1), padding=(3, 0), groups=32, bias=False)
+                )
+                (bn): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (bn): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+          )
+          (out_proj): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (dropout): Identity()
+        )
+        (drop_path): timm.DropPath(0)
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(256, 64, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+      )
+    )
+    (1): Embedding(
+      (proj): Conv2d_BN(
+        (c): LiePEFTConv2d(
+          (base): Conv2d(64, 128, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        )
+        (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (2): Sequential(
+      (0): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+            )
+            (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128)
+          )
+          (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(128, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (1): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+            )
+            (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128)
+          )
+          (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(128, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (2): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+            )
+            (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128)
+          )
+          (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(128, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (3): TViMBlock(
+        (op): SS2D(
+          (pool): AvgPool2d(kernel_size=4, stride=4, padding=0)
+          (local_conv): RepDW(
+            (conv): Conv2d_BN(
+              (c): LiePEFTConv2d(
+                (base): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=64, bias=False)
+              )
+              (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+            (conv1): LiePEFTConv2d(
+              (base): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), groups=64)
+            )
+            (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (out_norm): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
+          (in_proj): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): SiLU()
+          (conv2d): Rep_Inception(
+            (dwconv_h): RepDW_Axias(
+              (conv1): LiePEFTConv2d(
+                (base): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), groups=64)
+              )
+              (conv): Conv2d_BN(
+                (c): LiePEFTConv2d(
+                  (base): Conv2d(64, 64, kernel_size=(1, 7), stride=(1, 1), padding=(0, 3), groups=64, bias=False)
+                )
+                (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+            (dwconv_w): RepDW_Axias(
+              (conv1): LiePEFTConv2d(
+                (base): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1), groups=64)
+              )
+              (conv): Conv2d_BN(
+                (c): LiePEFTConv2d(
+                  (base): Conv2d(64, 64, kernel_size=(7, 1), stride=(1, 1), padding=(3, 0), groups=64, bias=False)
+                )
+                (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+          )
+          (out_proj): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (dropout): Identity()
+        )
+        (drop_path): timm.DropPath(0)
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(128, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+      )
+    )
+    (3): Embedding(
+      (proj): Conv2d_BN(
+        (c): LiePEFTConv2d(
+          (base): Conv2d(128, 384, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        )
+        (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (4): Sequential(
+      (0): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384, bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), groups=384)
+          )
+          (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (1): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384, bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), groups=384)
+          )
+          (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (2): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384, bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), groups=384)
+          )
+          (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (3): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384, bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), groups=384)
+          )
+          (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (4): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384, bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), groups=384)
+          )
+          (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (5): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384, bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), groups=384)
+          )
+          (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (6): TViMBlock(
+        (op): SS2D(
+          (pool): AvgPool2d(kernel_size=2, stride=2, padding=0)
+          (local_conv): RepDW(
+            (conv): Conv2d_BN(
+              (c): LiePEFTConv2d(
+                (base): Conv2d(192, 192, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=192, bias=False)
+              )
+              (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+            (conv1): LiePEFTConv2d(
+              (base): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), groups=192)
+            )
+            (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (out_norm): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+          (in_proj): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): SiLU()
+          (conv2d): Rep_Inception(
+            (dwconv_h): RepDW_Axias(
+              (conv1): LiePEFTConv2d(
+                (base): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), groups=192)
+              )
+              (conv): Conv2d_BN(
+                (c): LiePEFTConv2d(
+                  (base): Conv2d(192, 192, kernel_size=(1, 7), stride=(1, 1), padding=(0, 3), groups=192, bias=False)
+                )
+                (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+            (dwconv_w): RepDW_Axias(
+              (conv1): LiePEFTConv2d(
+                (base): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), groups=192)
+              )
+              (conv): Conv2d_BN(
+                (c): LiePEFTConv2d(
+                  (base): Conv2d(192, 192, kernel_size=(7, 1), stride=(1, 1), padding=(3, 0), groups=192, bias=False)
+                )
+                (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+          )
+          (out_proj): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (dropout): Identity()
+        )
+        (drop_path): timm.DropPath(0)
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+      )
+      (7): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384, bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), groups=384)
+          )
+          (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (8): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384, bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), groups=384)
+          )
+          (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (9): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384, bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), groups=384)
+          )
+          (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (10): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384, bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), groups=384)
+          )
+          (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (11): TViMBlock(
+        (op): SS2D(
+          (pool): AvgPool2d(kernel_size=2, stride=2, padding=0)
+          (local_conv): RepDW(
+            (conv): Conv2d_BN(
+              (c): LiePEFTConv2d(
+                (base): Conv2d(192, 192, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=192, bias=False)
+              )
+              (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+            (conv1): LiePEFTConv2d(
+              (base): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), groups=192)
+            )
+            (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (out_norm): LayerNorm((192,), eps=1e-05, elementwise_affine=True)
+          (in_proj): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): SiLU()
+          (conv2d): Rep_Inception(
+            (dwconv_h): RepDW_Axias(
+              (conv1): LiePEFTConv2d(
+                (base): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), groups=192)
+              )
+              (conv): Conv2d_BN(
+                (c): LiePEFTConv2d(
+                  (base): Conv2d(192, 192, kernel_size=(1, 7), stride=(1, 1), padding=(0, 3), groups=192, bias=False)
+                )
+                (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+            (dwconv_w): RepDW_Axias(
+              (conv1): LiePEFTConv2d(
+                (base): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1), groups=192)
+              )
+              (conv): Conv2d_BN(
+                (c): LiePEFTConv2d(
+                  (base): Conv2d(192, 192, kernel_size=(7, 1), stride=(1, 1), padding=(3, 0), groups=192, bias=False)
+                )
+                (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (bn): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+          )
+          (out_proj): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (dropout): Identity()
+        )
+        (drop_path): timm.DropPath(0)
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(1536, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(384, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+      )
+    )
+    (5): Embedding(
+      (proj): Conv2d_BN(
+        (c): LiePEFTConv2d(
+          (base): Conv2d(384, 512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        )
+        (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (6): Sequential(
+      (0): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=512, bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), groups=512)
+          )
+          (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(2048, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (1): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=512, bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), groups=512)
+          )
+          (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(2048, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (2): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=512, bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), groups=512)
+          )
+          (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(2048, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (3): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=512, bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), groups=512)
+          )
+          (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(2048, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (4): LocalBlock(
+        (dwconv): RepDW(
+          (conv): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=512, bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (conv1): LiePEFTConv2d(
+            (base): Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), groups=512)
+          )
+          (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(2048, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+        (drop_path): Identity()
+      )
+      (5): TViMBlock(
+        (op): SS2D(
+          (pool): AvgPool2d(kernel_size=1, stride=1, padding=0)
+          (local_conv): RepDW(
+            (conv): Conv2d_BN(
+              (c): LiePEFTConv2d(
+                (base): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128, bias=False)
+              )
+              (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+            (conv1): LiePEFTConv2d(
+              (base): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), groups=128)
+            )
+            (bn): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (out_norm): LayerNorm((384,), eps=1e-05, elementwise_affine=True)
+          (in_proj): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): SiLU()
+          (conv2d): Rep_Inception(
+            (dwconv_h): RepDW_Axias(
+              (conv1): LiePEFTConv2d(
+                (base): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256)
+              )
+              (conv): Conv2d_BN(
+                (c): LiePEFTConv2d(
+                  (base): Conv2d(256, 256, kernel_size=(1, 7), stride=(1, 1), padding=(0, 3), groups=256, bias=False)
+                )
+                (bn): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (bn): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+            (dwconv_w): RepDW_Axias(
+              (conv1): LiePEFTConv2d(
+                (base): Conv2d(256, 256, kernel_size=(1, 1), stride=(1, 1), groups=256)
+              )
+              (conv): Conv2d_BN(
+                (c): LiePEFTConv2d(
+                  (base): Conv2d(256, 256, kernel_size=(7, 1), stride=(1, 1), padding=(3, 0), groups=256, bias=False)
+                )
+                (bn): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (bn): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+            )
+          )
+          (out_proj): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (dropout): Identity()
+        )
+        (drop_path): timm.DropPath(0)
+        (mlp): FFN(
+          (fc1): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(512, 2048, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(2048, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (fc2): Conv2d_BN(
+            (c): LiePEFTConv2d(
+              (base): Conv2d(2048, 512, kernel_size=(1, 1), stride=(1, 1), bias=False)
+            )
+            (bn): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (act): GELU(approximate='none')
+          (drop): Dropout(p=0.0, inplace=False)
+        )
+      )
+    )
+  )
+  (norm): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (head): Linear(in_features=512, out_features=4, bias=True)
+)
