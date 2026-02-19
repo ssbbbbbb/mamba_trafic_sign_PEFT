@@ -13,6 +13,12 @@ from timm.utils import accuracy, ModelEma
 from losses import DistillationLoss
 import utils
 
+try:
+    from tqdm import tqdm
+    _HAS_TQDM = True
+except ImportError:
+    _HAS_TQDM = False
+
 def set_bn_state(model):
     for m in model.modules():
         if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
@@ -34,9 +40,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
         window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 100
+    # 若有 tqdm，且為主進程，使用 tqdm 進度條；否則維持原本的文字 log_every
+    if _HAS_TQDM and utils.is_main_process():
+        iterable = tqdm(data_loader, desc=header, leave=False)
+    else:
+        iterable = metric_logger.log_every(data_loader, print_freq, header)
 
-    for samples, targets in metric_logger.log_every(
-            data_loader, print_freq, header):
+    for samples, targets in iterable:
         samples = samples.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
 
@@ -78,12 +88,18 @@ def evaluate(data_loader, model, device):
     criterion = torch.nn.CrossEntropyLoss()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
-    header = 'Test:'
+    header = 'Val:'
 
     # switch to evaluation mode
     model.eval()
 
-    for images, target in metric_logger.log_every(data_loader, 10, header):
+    # 評估階段同樣加上 tqdm 進度條（若可用）
+    if _HAS_TQDM and utils.is_main_process():
+        iterable = tqdm(data_loader, desc=header, leave=False)
+    else:
+        iterable = metric_logger.log_every(data_loader, 10, header)
+
+    for images, target in iterable:
         images = images.to(device, non_blocking=True)
         target = target.to(device, non_blocking=True)
 

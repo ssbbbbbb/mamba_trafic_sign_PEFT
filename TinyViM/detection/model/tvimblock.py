@@ -9,7 +9,8 @@ import torch.utils.checkpoint as checkpoint
 from einops import rearrange, repeat
 from timm.models.layers import DropPath, trunc_normal_
 DropPath.__repr__ = lambda self: f"timm.DropPath({self.drop_prob})"
-import selective_scan_cuda
+# 使用已編譯好的 oflex 版本 CUDA 擴充，並統一別名為 selective_scan_cuda
+import selective_scan_cuda_oflex as selective_scan_cuda
 
 
 class Conv2d_BN(torch.nn.Sequential):

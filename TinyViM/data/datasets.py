@@ -61,6 +61,40 @@ class INatDataset(ImageFolder):
     # __getitem__ and __len__ inherited from ImageFolder
 
 
+class NumericImageFolder(ImageFolder):
+    """
+    自訂版 ImageFolder：
+    - 假設子資料夾名稱是整數字串（例如 '0','1',...,'42'）
+    - 以整數大小排序，而不是預設的字串排序
+
+    這樣可以保證：
+    - 資料夾 '0' 對應 label 0
+    - 資料夾 '1' 對應 label 1
+    - ...
+    - 資料夾 '42' 對應 label 42
+    """
+
+    def find_classes(self, directory: str):
+        # 參考 torchvision.datasets.folder.ImageFolder.find_classes 實作
+        # 只是這裡改成用 int() 來排序資料夾名稱
+        classes = [
+            d.name for d in os.scandir(directory) if d.is_dir()
+        ]
+        # 嘗試將資料夾名稱轉成 int，並以數字大小排序
+        try:
+            classes_int = sorted([int(c) for c in classes])
+            classes = [str(c) for c in classes_int]
+        except ValueError:
+            # 若有無法轉成整數的資料夾名稱，就退回原本的字串排序
+            classes = sorted(classes)
+
+        if not classes:
+            raise FileNotFoundError(f"找不到任何子資料夾於: {directory}")
+
+        class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
+        return classes, class_to_idx
+
+
 def build_dataset(is_train, args):
     transform = build_transform(is_train, args)
 
@@ -96,6 +130,19 @@ def build_dataset(is_train, args):
         dataset = INatDataset(args.data_path, train=is_train, year=2019,
                               category=args.inat_category, transform=transform)
         nb_classes = dataset.nb_classes
+    elif args.data_set == 'CUSTOM':
+        # 自訂資料集：
+        #   Train: data/Train/0..42
+        #   Val  : data/Val/0..42 （若不存在就退回使用 Train）
+        if is_train:
+            root = os.path.join(args.data_path, 'Train')
+        else:
+            val_root = os.path.join(args.data_path, 'Val')
+            root = val_root if os.path.exists(val_root) else os.path.join(args.data_path, 'Train')
+
+        # 使用 NumericImageFolder，確保資料夾 '0'..'42' 映射到 label 0..42
+        dataset = NumericImageFolder(root, transform=transform)
+        nb_classes = len(dataset.classes)
     return dataset, nb_classes
 
 

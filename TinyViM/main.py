@@ -1,11 +1,14 @@
 import argparse
+import csv
 import datetime
+import json
 import numpy as np
+import os
+import shutil
 import time
+
 import torch
 import torch.backends.cudnn as cudnn
-import json
-import os
 
 from pathlib import Path
 
@@ -24,6 +27,16 @@ from losses import DistillationLoss
 
 import model
 import utils
+from lie_peft import apply_lie_peft, freeze_backbone
+
+try:
+    import matplotlib.pyplot as plt
+    _HAS_MPL = True
+except ImportError:
+    _HAS_MPL = False
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def get_args_parser():
@@ -149,7 +162,7 @@ def get_args_parser():
     # Dataset parameters
     parser.add_argument('--data-path', default='/root/FastBaseline/data/imagenet', type=str,
                         help='dataset path')
-    parser.add_argument('--data-set', default='IMNET', choices=['CIFAR', 'IMNET', 'INAT', 'INAT19'],
+    parser.add_argument('--data-set', default='IMNET', choices=['CIFAR', 'IMNET', 'INAT', 'INAT19', 'CUSTOM'],
                         type=str, help='Image Net dataset path')
     parser.add_argument('--inat-category', default='name',
                         choices=['kingdom', 'phylum', 'class', 'order',
@@ -181,7 +194,24 @@ def get_args_parser():
                         help='url used to set up distributed training')
     parser.add_argument('--save_freq', default=1, type=int,
                         help='frequency of model saving')
-    
+
+    # Early stopping parameters
+    parser.add_argument('--early-stop-patience', type=int, default=0,
+                        help='If > 0, stop training early when val acc1 has not improved for this many epochs')
+    parser.add_argument('--early-stop-min-delta', type=float, default=0.0,
+                        help='Minimum improvement in val acc1 to reset early stopping counter')
+
+    # Lie-Group PEFT (Generalized Tensor-based PEFT via Lie Group)
+    parser.add_argument('--use-lie-peft', action='store_true',
+                        help='Enable Lie-group based PEFT fine-tuning (Generalized Tensor-based PEFT)')
+    parser.add_argument('--lie-rank', type=int, default=4,
+                        help='Lie-PEFT rank r')
+    parser.add_argument('--lie-alpha', type=float, default=16.0,
+                        help='Lie-PEFT scaling factor alpha')
+    parser.add_argument('--lie-target', type=str, default='all',
+                        choices=['all', 'head', 'last_stage'],
+                        help='Which layers to apply Lie-PEFT on')
+
     parser.add_argument('--deploy', action='store_true', default=False)
     parser.add_argument('--project', default='tinyvim', type=str)
     return parser
@@ -277,16 +307,23 @@ def main(args):
 
         checkpoint_model = checkpoint['model']
         state_dict = model.state_dict()
-        for k in ['head.l.weight', 'head.l.bias',
-                  'head_dist.l.weight', 'head_dist.l.bias']:
-            if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
-                print(f"Removing key {k} from pretrained checkpoint")
+        # 將分類 head / dist_head 等輸出層（或任何 shape 不符的層）從 checkpoint 中移除，
+        # 讓目前 num_classes=43 的 head 用新的隨機初始化權重。
+        for k in list(checkpoint_model.keys()):
+            if k in state_dict and checkpoint_model[k].shape != state_dict[k].shape:
+                print(f"Removing key {k} from pretrained checkpoint due to shape mismatch: "
+                      f"{checkpoint_model[k].shape} vs {state_dict[k].shape}")
                 del checkpoint_model[k]
 
         msg = model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
 
+    # 若啟用 Lie-Group PEFT，先載入預訓練權重，再凍結 backbone 並注入 Lie-PEFT 參數
     model.to(device)
+    if args.use_lie_peft:
+        print("Enable Lie-Group based PEFT (Generalized Tensor-based PEFT via Lie Group).")
+        freeze_backbone(model)
+        apply_lie_peft(model, rank=args.lie_rank, alpha=args.lie_alpha, target=args.lie_target)
 
     model_ema = None
     if args.model_ema:
@@ -380,15 +417,21 @@ def main(args):
     if args.eval:
         utils.replace_batchnorm(model) # Users may choose whether to merge Conv-BN layers during eval
         print(f"Evaluating model: {args.model}")
-        test_stats = evaluate(data_loader_val, model, device)
+        val_stats = evaluate(data_loader_val, model, device)
         print(
-            f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
+            f"Accuracy of the network on the {len(dataset_val)} val images: {val_stats['acc1']:.1f}%")
         return
 
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
     max_accuracy = 0.0
     max_accuracy_ema = 0.0
+    history = []
+    last_ckpt_path = None
+    best_ckpt_path = output_dir / 'checkpoint_best.pth'
+    # Early stopping 狀態
+    best_acc_early = 0.0
+    epochs_no_improve = 0
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             data_loader_train.sampler.set_epoch(epoch)
@@ -425,8 +468,9 @@ def main(args):
             remove_epoch = epoch - 3
             if remove_epoch >= 0 and utils.is_main_process():
                 os.remove(os.path.join(output_dir, 'checkpoint_'+str(remove_epoch)+'.pth'))
+            last_ckpt_path = ckpt_path
 
-        if max_accuracy < test_stats["acc1"]:
+        if max_accuracy < val_stats["acc1"]:
             utils.save_on_master({
                     'model': model_without_ddp.state_dict(),
                     'optimizer': optimizer.state_dict(),
@@ -436,17 +480,92 @@ def main(args):
                     'scaler': loss_scaler.state_dict(),
                     'args': args,
                 }, os.path.join(output_dir, 'checkpoint_best.pth'))
-        max_accuracy = max(max_accuracy, test_stats["acc1"])
+        max_accuracy = max(max_accuracy, val_stats["acc1"])
         
         print(f'Max accuracy: {max_accuracy:.2f}%')
+
+        # Early stopping：根據 val acc1 判斷是否持續進步
+        current_acc = float(val_stats["acc1"])
+        if current_acc > best_acc_early + args.early_stop_min_delta:
+            best_acc_early = current_acc
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+
+        if args.early_stop_patience > 0 and epochs_no_improve >= args.early_stop_patience:
+            print(
+                f"Early stopping triggered: val acc1 has not improved for "
+                f"{epochs_no_improve} epochs (best={best_acc_early:.2f}%)."
+            )
+            break
         
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                        **{f'test_{k}': v for k, v in test_stats.items()},
-                        'epoch': epoch,
-                        'n_parameters': n_parameters}
+                     **{f'val_{k}': v for k, v in val_stats.items()},
+                     'epoch': epoch,
+                     'n_parameters': n_parameters}
+        history.append(log_stats)
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
+
+    # 將每個 epoch 的數值存成 CSV，並在 test_output 下繪製曲線圖
+    if utils.is_main_process() and len(history) > 0:
+        test_output_root = PROJECT_ROOT / "test_output"
+        # 使用 --project 參數作為子資料夾名稱，方便區分不同實驗
+        # 例如：--project l -> final/test_output/l
+        test_output_dir = test_output_root / args.project
+        test_output_dir.mkdir(parents=True, exist_ok=True)
+
+        metrics_csv = test_output_dir / f"metrics_{args.model}_{output_dir.name}.csv"
+        fieldnames = sorted(history[0].keys())
+        with metrics_csv.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in history:
+                writer.writerow(row)
+        print(f"Saved metrics CSV to {metrics_csv}")
+
+        if _HAS_MPL:
+            epochs = [h["epoch"] for h in history]
+            train_loss = [h.get("train_loss") for h in history]
+            val_loss_hist = [h.get("val_loss") for h in history]
+            val_acc1_hist = [h.get("val_acc1") for h in history]
+
+            # Loss 曲線
+            plt.figure()
+            plt.plot(epochs, train_loss, label="train_loss")
+            plt.plot(epochs, val_loss_hist, label="val_loss")
+            plt.xlabel("Epoch")
+            plt.ylabel("Loss")
+            plt.legend()
+            plt.title(f"Loss Curve - {args.model}")
+            loss_png = test_output_dir / f"loss_curve_{args.model}_{output_dir.name}.png"
+            plt.savefig(loss_png, bbox_inches="tight")
+            plt.close()
+
+            # Acc@1 曲線
+            if any(a is not None for a in val_acc1_hist):
+                plt.figure()
+                plt.plot(epochs, val_acc1_hist, label="val_acc1")
+                plt.xlabel("Epoch")
+                plt.ylabel("Acc@1 (%)")
+                plt.legend()
+                plt.title(f"Accuracy Curve - {args.model}")
+                acc_png = test_output_dir / f"acc1_curve_{args.model}_{output_dir.name}.png"
+                plt.savefig(acc_png, bbox_inches="tight")
+                plt.close()
+
+            print(f"Saved curves to {test_output_dir}")
+
+        # 複製最佳與最後權重到 test_output
+        if best_ckpt_path.exists():
+            dst_best = test_output_dir / f"{args.model}_best.pth"
+            shutil.copy2(best_ckpt_path, dst_best)
+            print(f"Copied best checkpoint to {dst_best}")
+        if last_ckpt_path is not None and Path(last_ckpt_path).exists():
+            dst_last = test_output_dir / f"{args.model}_last.pth"
+            shutil.copy2(last_ckpt_path, dst_last)
+            print(f"Copied last checkpoint to {dst_last}")
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
